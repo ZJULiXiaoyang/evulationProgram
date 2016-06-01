@@ -1,0 +1,15 @@
+clear all,close all,clc;
+load('SIFTScaleInlierRates.mat');
+load('CSHOTcaleInlierRates.mat');
+load('LOINDScaleInlierRates.mat');
+load('RISASScaleInlierRates.mat');
+x=1:0.1:1.8;
+plot(x,inlierRates1);
+hold on;
+plot(x,inlierRates2);
+hold on;
+plot(x,inlierRates3);
+hold on;
+plot(x,inlierRates4);
+hold on;
+length

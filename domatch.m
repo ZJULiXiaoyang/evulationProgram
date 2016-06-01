@@ -1,0 +1,123 @@
+%%%keypoint1---2*num [u v]
+%%%flag23d---true-3D false-2D
+%%%flag---whether show the matching curve
+
+% function [unprecision,recall,inlierRate]= domatch(keypoint1,keypoint2,descriptor1,descriptor2, threshold,image1,image2,depthImage1,depthImage2,R,T,flag,numplot,num1,num2)
+function [unprecision,recall,inlierRate]= domatch(keypoint1,keypoint2,descriptor1,descriptor2, threshold,image1,image2,depthImage1,depthImage2,R,T,flag,flag23d,numplot,num1,num2,name)
+
+
+if flag23d
+    correspNum= correspondencenum( keypoint1,keypoint2,R,T,depthImage1,depthImage2);
+else
+    correspNum= correspondencenum2D( keypoint1,keypoint2 );
+end
+
+
+[matches, scores] = vl_ubcmatch(descriptor1,descriptor2,threshold);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[scores index]=sort(scores);
+total=size(scores,2);
+minNum=min(500,total);
+% minNum=ceil(total/2);
+if flag23d
+    for i=1:total
+        point1=keypoint1(1:2,matches(1,index(i)));
+        point2=keypoint2(1:2,matches(2,index(i)));
+        matches(3,index(i))=isCorrect(point1,point2,depthImage1,depthImage2,R,T);
+        matchKP1(i,:)=point1;
+        matchKP2(i,:)=point2;
+    end
+else
+    for i=1:total
+        point1=keypoint1(1:2,matches(1,index(i)));
+        point2=keypoint2(1:2,matches(2,index(i)));
+        if isCorrectHomo(point1,point2)
+            matches(3,index(i))=1;
+        else
+            matches(3,index(i))=0;
+        end
+        matchKP1(i,:)=point1;
+        matchKP2(i,:)=point2;
+    end
+end
+
+
+[unprecision,recall]=PRvalue(matchKP1,matchKP2,R,T,total,correspNum,depthImage1,depthImage2,flag23d);
+countNum=0;
+if flag%%%whether show the matching curve
+    I = zeros([size(image1,1) size(image1,2)+size(image2,2) size(image1,3)]);
+    I(:,1:size(image1,2),:)=image1;
+    I(:,size(image1,2)+1:size(image1,2)+size(image2,2),:)=image2;
+    figure(numplot);
+    imshow(I/255);
+    hold on;
+    for i=1:1:minNum
+        u1=keypoint1(1,matches(1,index(i)));
+        v1=keypoint1(2,matches(1,index(i)));
+        %         pathsize1=keypoint1(3,matches(1,index(i)));
+        pathsize1=10;
+        u2=keypoint2(1,matches(2,index(i)))+size(image1,2);
+        v2=keypoint2(2,matches(2,index(i)));
+        %         pathsize2=keypoint2(3,matches(2,index(i)));
+        pathsize2=10;
+        if matches(3,index(i))==0
+            
+            line([u1 u2], [v1 v2], 'Color', 'r');
+            plot(u1,v1,'o','Color','r','MarkerSize',pathsize1)
+            hold on;
+            plot(u2,v2,'o','Color','r','MarkerSize',pathsize2);
+            
+        else if matches(3,index(i))==1
+                countNum=countNum+1;
+                line([u1 u2], [v1 v2], 'Color', 'g');
+                plot(u1,v1,'o','Color','g','MarkerSize',pathsize1)
+                hold on;
+                plot(u2,v2,'o','Color','g','MarkerSize',pathsize2);
+            end
+        end
+        
+    end
+    flagMatch=false;%%%whether write the matching result to the .txt file
+    totalMatch=0;
+    wrongMatch=0;
+    if flagMatch
+        c1=fopen(strcat('./keypoint/',name,num2str(num1),'-',num2str(num2),'-',num2str(num1),'KP'),'w');
+        c2=fopen(strcat('./keypoint/',name,num2str(num1),'-',num2str(num2),'-',num2str(num2),'KP'),'w');
+        for ii=1:minNum
+            if matches(3,index(ii))==1
+                totalMatch=totalMatch+1;
+            else if matches(3,index(ii))==0
+                    wrongMatch=wrongMatch+1;
+                    if wrongMatch<10
+                        totalMatch=totalMatch+1;
+                    end
+                end
+            end
+        end
+        fprintf(c1,'%d\n',totalMatch);
+        fprintf(c2,'%d\n',totalMatch);
+        wrongMatch=0;
+        for  ii=1:minNum
+            if  matches(3,index(ii))==1
+                fprintf(c1,'%f ',keypoint1(1,matches(1,index(ii))));
+                fprintf(c1,'%f \n',keypoint1(2,matches(1,index(ii))));
+                fprintf(c2,'%f ',keypoint2(1,matches(2,index(ii))));
+                fprintf(c2,'%f \n',keypoint2(2,matches(2,index(ii))));
+            else if matches(3,index(ii))==0
+                    wrongMatch=wrongMatch+1;
+                    if wrongMatch<10
+                        fprintf(c1,'%f ',keypoint1(1,matches(1,index(ii))));
+                        fprintf(c1,'%f \n',keypoint1(2,matches(1,index(ii))));
+                        fprintf(c2,'%f ',keypoint2(1,matches(2,index(ii))));
+                        fprintf(c2,'%f \n',keypoint2(2,matches(2,index(ii))));
+                    end
+                end
+            end
+        end
+        fclose(c1);
+        fclose(c2);
+    end
+    inlierRate=countNum/minNum;
+end
+
+end
